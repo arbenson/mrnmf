@@ -225,7 +225,7 @@ class SerialNMF(MatrixHandler):
             yield key, val
 
 # Reducer that just sums votes
-class CountVotes():
+class MajorityVotes():
     def __init__(self, r):
         self.votes = {}
         self.r = r
@@ -242,3 +242,16 @@ class CountVotes():
 
         for key, val in self.close():
             yield key, val
+
+# Reducer that takes union
+class MajorityVotes():
+    def __init__(self):
+        self.votes = {}
+
+    def __call__(self, data):
+        for key, values in data:
+            for val in values:
+                self.votes[key] += val
+
+        for vote in self.votes:
+            yield vote, self.votes[vote]
