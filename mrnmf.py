@@ -12,7 +12,7 @@ import random
 import struct
 
 import numpy as np
-from cvxopt import matrix, solvers
+#from cvxopt import matrix, solvers
 
 import util
 import dumbo
@@ -167,7 +167,6 @@ def HotTopixx(M, epsilon, r):
     X = np.reshape(np.array(solvers.lp(c, G, h, A=A, b=b)['x']), (n, n))
     return list(np.argsort(np.diag(X))[-r:])
 
-
 # Mapper that reads in rows of the matrix and computes NMF on blocks
 class SerialNMF(MatrixHandler):
     def __init__(self, r=8, epsilon=1e-5, blocksize=12):
@@ -180,8 +179,7 @@ class SerialNMF(MatrixHandler):
     
     def NMF(self):
         M = np.array(data)
-        cols = HotTopixx(M, epsilon, r)
-        return numpy.linalg.qr(A,'r')
+        return HotTopixx(M, epsilon, r)
     
     def compress(self):
         # Compute NMF on the data accumulated so far.
@@ -243,15 +241,75 @@ class MajorityVotes():
         for key, val in self.close():
             yield key, val
 
-# Reducer that takes union
-class MajorityVotes():
+class GaussianReduction(MatrixHandler):
+    def __init__(self, blocksize=5):
+        MatrixHandler.__init__(self)
+        self.blocksize = blocksize
+        self.data = []
+        self.q = 100
+        self.A_curr = None
+    
+    def compress(self):
+        if self.ncols is None or len(self.data) == 0:
+            return
+
+        t0 = time.time()
+        A_flush = np.random.randn(self.q, len(self.data)) * numpy.mat(self.data)
+        dt = time.time() - t0
+        self.counters['numpy time (millisecs)'] += int(1000 * dt)
+
+        # Add flushed update to local copy
+        if self.A_curr == None:
+            self.A_curr = A_flush
+        else:
+            self.A_curr += A_flush
+        self.data = []
+                        
+    def collect(self, key, value):
+        self.data.append(value)
+        self.nrows += 1
+        
+        if len(self.data) > self.blocksize * self.ncols:
+            self.counters['Gaussian compressions'] += 1
+            # compress the data
+            self.compress()
+            
+        # write status updates so Hadoop doesn't complain
+        if self.nrows % 50000 == 0:
+            self.counters['rows processed'] += 50000
+
+    def close(self):
+        self.counters['rows processed'] += self.nrows % 50000
+        self.compress()
+        if self.A_curr is not None:
+            for ind, row in enumerate(self.A_curr.getA()):
+                yield ind, util.array2list(row)
+
+    def __call__(self, data):
+        self.collect_data(data)
+
+        # finally, output data
+        for key, val in self.close():
+            yield key, val
+
+
+class ProjectionReducer():
     def __init__(self):
-        self.votes = {}
+        self.data = []
+        self.epsilon = 1e-5
+        self.r = 10
+
+    def close(self):
+        M = np.array(data)
+        cols = HotTopixx(M, self.epsilon, self.r)
+        for col in cols:
+            yield np.random.rand() * 10000, col
+        
 
     def __call__(self, data):
         for key, values in data:
             for val in values:
-                self.votes[key] += val
+                self.data.append(val)
 
-        for vote in self.votes:
-            yield vote, self.votes[vote]
+        for key, val in self.close():
+            yield key, val
