@@ -38,11 +38,7 @@ def starter_helper(prog, use_dirtsqr=False, use_house=False):
     print 'my path: ' + mypath    
 
     prog.addopt('file', os.path.join(mypath, 'util.py'))
-    prog.addopt('file', os.path.join(mypath, 'mrmc.py'))
-    if use_dirtsqr:
-        prog.addopt('file', os.path.join(mypath, 'dirtsqr.py'))
-    if use_house:
-        prog.addopt('file', os.path.join(mypath, 'HouseholderQR.py'))
+    prog.addopt('file', os.path.join(mypath, 'mrnmf.py'))
 
     splitsize = prog.delopt('split_size')
     if splitsize is not None:
@@ -242,11 +238,11 @@ class MajorityVotes():
             yield key, val
 
 class GaussianReduction(MatrixHandler):
-    def __init__(self, blocksize=5):
+    def __init__(self, blocksize=5, projsize=200):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
         self.data = []
-        self.q = 100
+        self.projsize = projsize
         self.A_curr = None
     
     def compress(self):
@@ -254,7 +250,8 @@ class GaussianReduction(MatrixHandler):
             return
 
         t0 = time.time()
-        A_flush = np.random.randn(self.q, len(self.data)) * numpy.mat(self.data)
+        G = np.random.randn(self.projsize, len(self.data)) / 10.
+        A_flush = G * np.mat(self.data)
         dt = time.time() - t0
         self.counters['numpy time (millisecs)'] += int(1000 * dt)
 
@@ -292,17 +289,38 @@ class GaussianReduction(MatrixHandler):
         for key, val in self.close():
             yield key, val
 
+class ArraySumReducer(MatrixHandler):
+    def __init__(self):
+        MatrixHandler.__init__(self)
+        self.row_sums = {}
+
+    def collect(self, key, value):
+        if key not in self.row_sums:
+            self.row_sums[key] = value
+        else:
+            if len(value) != len(self.row_sums[key]):
+                print >>sys.stderr, 'value: ' + str(value)
+                print >>sys.stderr, 'value: ' + str(self.row_sums[key])
+                raise DataFormatException('Differing array lengths for summing')
+            for k in xrange(len(self.row_sums[key])):
+                self.row_sums[key][k] += value[k]
+    
+    def __call__(self, data):
+        for key, values in data:
+            self.collect_data(values, key)
+        for key in self.row_sums:
+            yield key, self.row_sums[key]
 
 class ProjectionReducer():
     def __init__(self):
         self.data = []
-        self.epsilon = 1e-5
-        self.r = 10
+        self.cols = set()
 
     def close(self):
-        M = np.array(data)
-        cols = HotTopixx(M, self.epsilon, self.r)
-        for col in cols:
+        for row in self.data:
+            self.cols.add(row.index(min(row)))
+            self.cols.add(row.index(max(row)))
+        for col in self.cols:
             yield np.random.rand() * 10000, col
         
 
