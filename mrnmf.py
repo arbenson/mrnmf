@@ -17,7 +17,6 @@ import numpy as np
 import util
 import dumbo
 import dumbo.backends.common
-
 from dumbo import opt
 
 # some variables
@@ -330,4 +329,138 @@ class ProjectionReducer():
                 self.data.append(val)
 
         for key, val in self.close():
+            yield key, val
+
+class NNLSMapper1(MatrixHandler):
+    def __init__(self, cols, blocksize=5):
+        MatrixHandler.__init__(self)
+        self.blocksize = blocksize
+        self.cols = cols
+        self.cols.sort()
+        self.data = []
+        self.A_curr = None
+    
+    def compress(self):
+        if self.ncols is None or len(self.data) == 0:
+            return
+
+        t0 = time.time()
+        A_mat = np.mat(self.data)
+        A_flush = A_mat.T * A_mat[:, self.cols]
+        dt = time.time() - t0
+        self.counters['numpy time (millisecs)'] += int(1000 * dt)
+
+        # Add flushed update to local copy
+        if self.A_curr == None:
+            self.A_curr = A_flush
+        else:
+            self.A_curr += A_flush
+        self.data = []
+                        
+    def collect(self, key, value):
+        self.data.append(value)
+        self.nrows += 1
+        
+        if len(self.data) > self.blocksize * self.ncols:
+            self.counters['Gaussian compressions'] += 1
+            # compress the data
+            self.compress()
+            
+        # write status updates so Hadoop doesn't complain
+        if self.nrows % 50000 == 0:
+            self.counters['rows processed'] += 50000
+
+    def close(self):
+        self.counters['rows processed'] += self.nrows % 50000
+        self.compress()
+        if self.A_curr is not None:
+            for ind, row in enumerate(self.A_curr.getA()):
+                yield ind, util.array2list(row)
+
+    def __call__(self, data):
+        self.collect_data(data)
+
+        # finally, output data
+        for key, val in self.close():
+            yield key, val
+
+@opt("getpath", "yes")
+class NNLSReduce(MatrixHandler):
+    def __init__(self, cols):
+        MatrixHandler.__init__(self)
+        self.row_sums = {}
+        self.cols = cols
+        self.cols.sort()
+
+    def collect(self, key, value):
+        if key not in self.row_sums:
+            self.row_sums[key] = value
+        else:
+            if len(value) != len(self.row_sums[key]):
+                print >>sys.stderr, 'value: ' + str(value)
+                print >>sys.stderr, 'value: ' + str(self.row_sums[key])
+                raise DataFormatException('Differing array lengths for summing')
+            for k in xrange(len(self.row_sums[key])):
+                self.row_sums[key][k] += value[k]
+
+    def close(self):
+        # We need to emit:
+        #    (1) A_i^TW as many key-value pairs
+        #    (2) W^TW as a single key-value pair
+
+        # First, the row sums
+        for i, row in enumerate(self.row_sums):
+            yield ("RHS", i), self.row_sums[row]
+        
+        # We need need output W^TW with the correct permutation
+        WTW = []
+        for i in self.cols:
+            WTW.append(self.row_sums[i])
+
+        yield ("WTW", -1), WTW
+    
+    def __call__(self, data):
+        for key, values in data:
+            self.collect_data(values, key)
+        for key, val in self.close():
+            yield key, val
+
+@opt("getpath", "yes")
+class NNLSMapper2(MatrixHandler):
+    def __init__(self, WTW_path):
+        MatrixHandler.__init__(self)
+        self.parse_WTW(WTW_path)
+        self.data = []
+
+    def parse_WTW(self, WTW_path):
+        self.WTW = []
+        try:
+            f = open(WTW_path, 'r')
+        except:
+            # We may be expecting only the file to be distributed with the script
+            f = open(WTW_path.split('/')[-1], 'r')
+        mat = f.read()
+        f.close()
+        for row in mat[mat.rfind(')')+1:].strip().split('],'):
+            row = [float(v.rstrip(']')) \
+                       for v in row[row.rfind('[') + 1:row.rfind(']')].split(',')]
+            self.WTW.append(row)
+        self.WTW = np.array(self.WTW)
+        
+    def collect(self, key, value):
+        # Solve NNLS problem
+        # TODO: this needs to change to non-negative
+        b = np.array(value).T
+        sol = np.linalg.lstsq(self.WTW, b)
+        h = list(sol[0])
+        #res = sol[1][0]
+
+        self.data.append((("H", key), h))
+        #self.data.append((("Resdiual", key), res))
+            
+    def __call__(self, data):
+        self.collect_data(data)
+
+        # finally, output data
+        for key, val in self.data:
             yield key, val

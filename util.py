@@ -35,7 +35,7 @@ def parse_matrix_txt(mpath):
     except:
         # We may be expecting only the file to be distributed
         # with the script
-        f = open(mpath.split('/')[-1], 'r')        
+        f = open(mpath.split('/')[-1], 'r')
     data = []
     for line in f:
         ind = line.rfind(')')
@@ -159,7 +159,7 @@ class CommandManager:
 
     def copy_from_hdfs(self, inp, outp, delete=True):
         if delete and os.path.exists(outp):
-          os.remove(outp)
+                os.remove(outp)
         copy_cmd = 'hadoop fs -copyToLocal ' \
                    + '%s/part-00000 %s' % (inp, outp)
         self.exec_cmd(copy_cmd)
@@ -180,4 +180,6 @@ class CommandManager:
             output = inp + '.out'
         parse_cmd = 'python %s %s > %s' % (reader, inp, output)
         self.exec_cmd(parse_cmd)
+
+    
 
