@@ -6,10 +6,11 @@ Copyright (c) 2013
 """
 
 import dumbo
-import mrnmf
 import os
 import sys
 import util
+import mrnmf
+
 
 # create the global options structure
 gopts = util.GlobalOptions()

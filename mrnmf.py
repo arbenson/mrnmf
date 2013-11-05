@@ -11,13 +11,20 @@ import time
 import random
 import struct
 
-import numpy as np
 #from cvxopt import matrix, solvers
 
 import util
 import dumbo
 import dumbo.backends.common
 from dumbo import opt
+
+# TODO (arbenson): This is a total hack.
+os.environ['PYTHON_EGG_CACHE'] = 'egg_cache'
+import numpy as np
+try:
+    from scipy import optimize
+except:
+    print >>sys.stderr, 'Missing SciPy'
 
 # some variables
 ID_MAPPER = 'org.apache.hadoop.mapred.lib.IdentityMapper'
@@ -30,7 +37,7 @@ class DataFormatException(Exception):
         return repr(self.value)
 
 
-def starter_helper(prog, use_dirtsqr=False, use_house=False):
+def starter_helper(prog):
     print 'running starter!'
 
     mypath = os.path.dirname(__file__)
@@ -38,6 +45,11 @@ def starter_helper(prog, use_dirtsqr=False, use_house=False):
 
     prog.addopt('file', os.path.join(mypath, 'util.py'))
     prog.addopt('file', os.path.join(mypath, 'mrnmf.py'))
+
+    for egg in ['/home/arbenson/hadoop_env/scipy-0.13.0/dist/scipy-0.13.0-py2.6-linux-x86_64.egg',
+                '/home/arbenson/hadoop_env/numpy-1.8.0/dist/numpy-1.8.0-py2.6-linux-x86_64.egg']:
+        prog.addopt('libegg', egg)
+        prog.addopt('file', egg)
 
     splitsize = prog.delopt('split_size')
     if splitsize is not None:
@@ -448,15 +460,9 @@ class NNLSMapper2(MatrixHandler):
         self.WTW = np.array(self.WTW)
         
     def collect(self, key, value):
-        # Solve NNLS problem
-        # TODO: this needs to change to non-negative
-        b = np.array(value).T
-        sol = np.linalg.lstsq(self.WTW, b)
-        h = list(sol[0])
-        #res = sol[1][0]
-
-        self.data.append((("H", key), h))
-        #self.data.append((("Resdiual", key), res))
+        sol, res = optimize.nnls(self.WTW, value)
+        self.data.append((("H", key), sol))
+        self.data.append((("Residual", key), res))
             
     def __call__(self, data):
         self.collect_data(data)

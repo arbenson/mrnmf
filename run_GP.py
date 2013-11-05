@@ -27,9 +27,8 @@ cm = util.CommandManager(verbose=options.verbose)
 
 local_out = options.local_out
 out_file = lambda f: local_out + '/' + f
-if os.path.exists(local_out):
-  shutil.rmtree(local_out)
-os.mkdir(local_out)
+if not os.path.exists(local_out):
+    os.mkdir(local_out)
 hadoop = options.hadoop
 in1 = options.input
 out = options.out
