@@ -96,6 +96,41 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
                 value = self.unpacker.unpack(value)
             else:
                 value = [float(p) for p in value.split()]
+        elif isinstance(value, np.ndarray):
+            # verify column size
+            if value.ndim == 2:
+                # it's a block
+                if self.ncols == None:
+                    self.ncols = value.shape[1]
+                if value.shape[1] != self.ncols:
+                    raise DataFormatException(
+                        'Number of columns in value did not match number of columns in matrix')
+                for row in value:
+                    row = row.tolist()
+                    self.collect_data_instance(key, row)
+                return
+            else:
+                value = value.tolist() # convert and continue below
+
+        if self.ncols == None:
+            self.ncols = len(value)
+            print >>sys.stderr, 'Matrix size: %i columns' % (self.ncols)
+        if len(value) != self.ncols:
+            raise DataFormatException(
+                'Length of value did not match number of columns')
+        self.collect(key, value)
+
+        
+    """
+    def collect_data_instance(self, key, value):
+        if isinstance(value, str):
+            if not self.deduced:
+                self.deduced = self.deduce_string_type(value)
+                # handle conversion from string
+            if self.unpacker is not None:
+                value = self.unpacker.unpack(value)
+            else:
+                value = [float(p) for p in value.split()]
 
         if self.ncols == None:
             self.ncols = len(value)
@@ -104,6 +139,7 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
             raise DataFormatException(
                 'Length of value did not match number of columns')
         self.collect(key, value)        
+    """
 
     def collect_data(self, data, key=None):
         if key == None:
@@ -249,7 +285,7 @@ class MajorityVotes():
             yield key, val
 
 class GaussianReduction(MatrixHandler):
-    def __init__(self, blocksize=5, projsize=100):
+    def __init__(self, blocksize=5, projsize=200):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
         self.data = []
@@ -261,7 +297,7 @@ class GaussianReduction(MatrixHandler):
             return
 
         t0 = time.time()
-        G = np.random.randn(self.projsize, len(self.data)) / 10.
+        G = np.random.randn(self.projsize, len(self.data)) / 100.
         A_flush = G * np.mat(self.data)
         dt = time.time() - t0
         self.counters['numpy time (millisecs)'] += int(1000 * dt)
@@ -520,6 +556,16 @@ class SVDSelect(MatrixHandler):
         for col in cols:
             self.data.append(col)
 
+    def multicollect(self, key, value):
+        """ Collect multiple rows at once with a single key. """
+        nkeys = len(value)
+        newkey = ('multi',nkeys,key)
+        
+        self.keys.append(newkey)
+        
+        for row in value:
+            self.add_row(row.tolist())
+
     def close(self):
         self.counters['rows processed'] += self.nrows % 50000
         self.compress()
@@ -538,3 +584,82 @@ class SVDSelect(MatrixHandler):
 
         for key, val in self.close():
             yield key, val
+
+class ColSumsMap(MatrixHandler):
+    def __init__(self):
+        MatrixHandler.__init__(self)
+        self.data = {}
+    
+    def collect(self, key, value):
+        for col, v in enumerate(value):
+            if col in self.data:
+                self.data[col] += v
+            else:
+                self.data[col] = v
+
+
+    def __call__(self, data):
+        self.collect_data(data)
+
+        for key in self.data:
+            yield key, self.data[key]
+
+class ColSumsRed():
+    def __init__(self):
+        pass
+
+    def __call__(self, data):
+        for key, values in data:
+            yield key, sum(values)
+
+class ColScale(MatrixHandler):
+    def __init__(self, cols, blocksize=3):
+        MatrixHandler.__init__(self)        
+        self.blocksize = blocksize
+        self.data = []
+        self.keys = []
+        self.small = np.mat(np.diag(cols))
+
+    def compress(self):        
+        # Compute the matmul on the data accumulated so far
+        if self.ncols is None or len(self.data) == 0:
+            return
+
+        self.counters['MatMul compression'] += 1
+
+        t0 = time.time()
+        A = np.mat(self.data)
+        out_mat = A * self.small
+        dt = time.time() - t0
+        self.counters['numpy time (millisecs)'] += int(1000 * dt)
+
+        # reset data and add flushed update to local copy
+        self.data = []
+        for i, row in enumerate(out_mat.getA()):
+            yield self.keys[i], struct.pack('d' * len(row), *row)
+
+        # clear the keys
+        self.keys = []
+    
+    def collect(self, key, value):
+        self.keys.append(key)
+        self.data.append(value)
+        self.nrows += 1
+        
+        # write status updates so Hadoop doesn't complain
+        if self.nrows%50000 == 0:
+            self.counters['rows processed'] += 50000
+
+    def __call__(self, data):
+        for key,value in data:
+            self.collect_data_instance(key, value)
+
+            # if we accumulated enough rows, output some data
+            if len(self.data) >= self.blocksize * self.ncols:
+                for key, val in self.compress():
+                    yield key, val
+                    
+        # output data the end of the data
+        for key, val in self.compress():
+            yield key, val
+
