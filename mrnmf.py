@@ -135,7 +135,7 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
                                           + ' is not a multiple of 8.')
         return True
 
-def HotTopixx(M, epsilon, r):
+def HottTopixx(M, epsilon, r):
     # Treating variables in X row-major
 
     p = np.random.random((n, 1))
@@ -186,7 +186,7 @@ class SerialNMF(MatrixHandler):
     
     def NMF(self):
         M = np.array(data)
-        return HotTopixx(M, epsilon, r)
+        return HottTopixx(M, epsilon, r)
     
     def compress(self):
         # Compute NMF on the data accumulated so far.
@@ -249,7 +249,7 @@ class MajorityVotes():
             yield key, val
 
 class GaussianReduction(MatrixHandler):
-    def __init__(self, blocksize=5, projsize=200):
+    def __init__(self, blocksize=5, projsize=100):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
         self.data = []
@@ -469,4 +469,72 @@ class NNLSMapper2(MatrixHandler):
 
         # finally, output data
         for key, val in self.data:
+            yield key, val
+
+
+class SVDSelect(MatrixHandler):
+    def __init__(self, blocksize=3, isreducer=False, isfinal=False):
+        MatrixHandler.__init__(self)
+        self.blocksize = blocksize
+        self.isreducer = isreducer
+        self.isfinal = isfinal
+        self.data = []
+    
+    def QR(self):
+        return np.linalg.qr(np.array(self.data),'r')
+    
+    def compress(self):
+        # Compute a QR factorization on the data accumulated so far.
+        if self.ncols is None or len(self.data) < self.ncols:
+            return
+
+        t0 = time.time()
+        R = self.QR()
+        dt = time.time() - t0
+        self.counters['numpy time (millisecs)'] += int(1000 * dt)
+
+        # reset data and re-initialize to R
+        self.data = []
+        for row in R:
+            self.data.append(util.array2list(row))
+                        
+    def collect(self, key, value):
+        self.data.append(value)
+        self.nrows += 1
+        
+        if len(self.data) > self.blocksize * self.ncols:
+            self.counters['QR Compressions'] += 1
+            self.compress()
+            
+        # write status updates so Hadoop doesn't complain
+        if self.nrows % 50000 == 0:
+            self.counters['rows processed'] += 50000
+
+    def compute_extreme_pts(self):
+        _, S, V = np.linalg.svd(np.array(self.data))
+        self.data = []
+        cols = set()
+        for row in S * V:
+            cols.add(np.argmax(row))
+            cols.add(np.argmin(row))
+        for col in cols:
+            self.data.append(col)
+
+    def close(self):
+        self.counters['rows processed'] += self.nrows % 50000
+        self.compress()
+        if self.isreducer and self.isfinal:
+            self.compute_extreme_pts()
+        for i, row in enumerate(self.data):
+            key = np.random.randint(0, 4000000000)
+            yield key, row
+
+    def __call__(self, data):
+        if not self.isreducer:
+            self.collect_data(data)
+        else:
+            for key, values in data:
+                self.collect_data(values, key)
+
+        for key, val in self.close():
             yield key, val

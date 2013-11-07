@@ -147,7 +147,7 @@ class CommandManager:
         return retcode
 
     # simple wrapper for running dumbo scripts with options provided as a list
-    def run_dumbo(self, script, hadoop='', opts=[]):
+    def run_dumbo(self, script, hadoop='', opts=[], feathers=False):
         cmd = 'dumbo start ' + script
         if hadoop != '':
             cmd += ' -hadoop '
@@ -155,6 +155,8 @@ class CommandManager:
         for opt in opts:
             cmd += ' '
             cmd += opt
+        if feathers:
+            cmd += ' -libjar feathers.jar'
         self.exec_cmd(cmd)
 
     def copy_from_hdfs(self, inp, outp, delete=True):
