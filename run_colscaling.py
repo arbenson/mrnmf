@@ -39,7 +39,7 @@ if out == '':
 
 # Column scaling:
 out1 = out + '_1'
-cm.run_dumbo('colsums.py', hadoop,
+cm.run_dumbo('ColSums.py', hadoop,
              ['-mat ' + in1, '-output ' + out1, '-reduce_schedule 40,1'])
 
 # Copy columns locally
@@ -49,7 +49,7 @@ cm.parse_seq_file(colsums_file, colsums_file + '.out')
 
 out2 = out + '_2'
 cm.run_dumbo('ColScaling.py', hadoop,
-             ['-mat ' + in1, '-output ' + out1, '-reduce_schedule 40,1',
+             ['-mat ' + in1, '-output ' + out2, '-reduce_schedule 40,1',
               '-sums ' + colsums_file + '.out'])
 
 try:

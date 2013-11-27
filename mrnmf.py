@@ -618,7 +618,7 @@ class ColScale(MatrixHandler):
         self.blocksize = blocksize
         self.data = []
         self.keys = []
-        self.small = np.mat(np.diag(cols))
+        self.small = np.mat(np.linalg.inv(np.diag(cols)))
 
     def compress(self):        
         # Compute the matmul on the data accumulated so far
