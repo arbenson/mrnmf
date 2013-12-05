@@ -1,19 +1,13 @@
 #!/usr/bin/env dumbo
 
 """
-tssvd.py
+ColSums.py
 ===========
 
-Driver code for NMF column selection using the SVD approach.
-Give A, compute A = USV', and let Z = SV'.  The extreme points
-in A are the same as the extreme points in Z, since we have
-only hit the data points with a linear transformation.  However,
-the transformation has introduced many zeros, and we only need
-to look at the non-zero region, so we can consider S to be the
-square SVD matrix.
+Driver code for computing the column sums of a matrix.
 
 Example usage:
-     dumbo start tssvd.py -mat A_800M_10.bseq \
+     dumbo start ColSums.py -mat A_800M_10.bseq \
      -reduce_schedule 40,1 -hadoop icme-hadoop1
 
 
