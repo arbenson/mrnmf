@@ -285,7 +285,7 @@ class MajorityVotes():
             yield key, val
 
 class GaussianReduction(MatrixHandler):
-    def __init__(self, blocksize=5, projsize=200):
+    def __init__(self, blocksize=5, projsize=400):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
         self.data = []
@@ -358,18 +358,32 @@ class ArraySumReducer(MatrixHandler):
         for key in self.row_sums:
             yield key, self.row_sums[key]
 
+#@opt("getpath", "yes")
 class ProjectionReducer():
-    def __init__(self):
+    def __init__(self, target_rank=None):
         self.data = []
-        self.cols = set()
+        self.votes = {}
+        self.target_rank = target_rank
 
     def close(self):
         for row in self.data:
-            self.cols.add(row.index(min(row)))
-            self.cols.add(row.index(max(row)))
-        for col in self.cols:
-            yield np.random.rand() * 10000, col
+            min_ind = row.index(min(row))
+            max_ind = row.index(max(row))
+            for ind in [min_ind, max_ind]:
+                if ind not in self.votes:
+                    self.votes[ind] = 1
+                else:
+                    self.votes[ind] += 1
+
+        self.votes = sorted(self.votes.items(), key=lambda x: x[1], reverse=True)
+        for v in self.votes:
+            print >>sys.stderr, str(v)
         
+        if self.target_rank == None or self.target_rank > len(self.votes):
+            self.target_rank = len(self.votes)
+            
+        for v in self.votes[0:self.target_rank]:
+            yield np.random.rand() * 10000, v[0]
 
     def __call__(self, data):
         for key, values in data:
@@ -384,7 +398,6 @@ class NNLSMapper1(MatrixHandler):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
         self.cols = cols
-        self.cols.sort()
         self.data = []
         self.A_curr = None
     
@@ -438,7 +451,6 @@ class NNLSReduce(MatrixHandler):
         MatrixHandler.__init__(self)
         self.row_sums = {}
         self.cols = cols
-        self.cols.sort()
 
     def collect(self, key, value):
         if key not in self.row_sums:
@@ -494,11 +506,23 @@ class NNLSMapper2(MatrixHandler):
                        for v in row[row.rfind('[') + 1:row.rfind(']')].split(',')]
             self.WTW.append(row)
         self.WTW = np.array(self.WTW)
+        cond = np.linalg.cond(self.WTW, p=2)
+        cond2 = np.linalg.cond(np.mat(self.WTW)[0:-1,0:-1], p=2)
+        U, s, V = np.linalg.svd(self.WTW)        
+        print >>sys.stderr, 'condition # of WTW: ' + str(cond)
+        print >>sys.stderr, 'condition # of WTW: ' + str(cond2)
+        print >>sys.stderr, 'singular values: ' + str(s)
+        for row in self.WTW:
+            print >> sys.stderr, str(row)
+
+        
+
         
     def collect(self, key, value):
         sol, res = optimize.nnls(self.WTW, value)
         self.data.append((("H", key), sol))
-        self.data.append((("Residual", key), res))
+        rel_err = res / np.linalg.norm(value, 2)
+        self.data.append((("Relative errors", key), rel_err))
             
     def __call__(self, data):
         self.collect_data(data)
