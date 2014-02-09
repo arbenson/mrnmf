@@ -17,6 +17,7 @@ gopts = util.GlobalOptions()
     
 def runner(job):
     blocksize = gopts.getintkey('blocksize')
+    rank = gopts.getintkey('rank')
     schedule = gopts.getstrkey('reduce_schedule')
     
     schedule = schedule.split(',')
@@ -28,7 +29,7 @@ def runner(job):
         else:
             mapper = mrnmf.ID_MAPPER
             # TODO: Make the target rank an argument
-            reducer = mrnmf.ProjectionReducer(6)
+            reducer = mrnmf.ProjectionReducer(rank)
             nreducers = 1
         job.additer(mapper=mapper, reducer=reducer,
                     opts=[('numreducetasks', str(nreducers))])
@@ -37,7 +38,8 @@ def starter(prog):
     # set the global opts    
     gopts.prog = prog
     
-    gopts.getintkey('blocksize',3)
+    gopts.getintkey('blocksize', 3)
+    gopts.getintkey('rank', 10)
     gopts.getstrkey('reduce_schedule', '1')
 
     mat = mrnmf.starter_helper(prog)

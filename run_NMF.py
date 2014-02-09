@@ -20,6 +20,8 @@ parser.add_option('-t', '--times_output', dest='times_out', default='times',
                   help='file for storing command times')
 parser.add_option('-a', '--algorithm', dest='algorithm', default='svd',
                   help='Algorithm for NMF. Options are {gp, svd}.')
+parser.add_option('-r', '--rank', dest='rank', default='10',
+                  help='Target rank for the factorization')
 parser.add_option('-H', '--hadoop', dest='hadoop', default='',
                   help='name of hadoop for Dumbo')
 parser.add_option('-q', '--quiet', action='store_false', dest='verbose',
@@ -52,7 +54,8 @@ else:
 
 # Column selection
 cm.run_dumbo(script, hadoop,
-             ['-mat ' + in1, '-output ' + out1, '-reduce_schedule 40,1'])
+             ['-mat ' + in1, '-output ' + out1, '-rank ' + options.rank,
+              '-reduce_schedule 40,1'])
 
 # Copy columns locally
 cols_file = out_file('cols.txt')
