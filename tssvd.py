@@ -31,6 +31,7 @@ gopts = util.GlobalOptions()
 
 def runner(job):
     blocksize = gopts.getintkey('blocksize')
+    rank = gopts.getintkey('rank')
     schedule = gopts.getstrkey('reduce_schedule')
     
     schedule = schedule.split(',')
@@ -38,9 +39,9 @@ def runner(job):
         isfinal = (i == len(schedule) - 1)
         nreducers = int(part)
         mapper = mrnmf.SVDSelect(blocksize=blocksize, isreducer=False,
-                                 isfinal=isfinal)
+                                 isfinal=isfinal, rank=rank)
         reducer = mrnmf.SVDSelect(blocksize=blocksize, isreducer=True,
-                                  isfinal=isfinal)
+                                  isfinal=isfinal, rank=rank)
         job.additer(mapper=mapper,reducer=reducer,
                     opts = [('numreducetasks', str(nreducers))])    
 
@@ -48,8 +49,9 @@ def starter(prog):
     # set the global opts    
     gopts.prog = prog
     
-    gopts.getintkey('blocksize',3)
-    gopts.getstrkey('reduce_schedule','1')
+    gopts.getintkey('blocksize', 3)
+    gopts.getintkey('rank', 6)
+    gopts.getstrkey('reduce_schedule', '1')
 
     mat = mrnmf.starter_helper(prog)
     if not mat: return "'mat' not specified"

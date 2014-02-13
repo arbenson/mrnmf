@@ -447,20 +447,35 @@ def HottTopixx(M, epsilon, r):
     X = np.reshape(np.array(solvers.lp(c, G, h, A=A, b=b)['x']), (n, n))
     return list(np.argsort(np.diag(X))[-r:])
 
+def SPA(A, r):
+    cols = []
+    m, n = A.shape
+    assert(m == n)
+    for _ in xrange(r):
+        col_norms = np.sum(np.abs(A) ** 2, axis=0)
+        col_ind = np.argmax(col_norms)
+        cols.append(col_ind)
+        col = np.reshape(A[:, col_ind], (n, 1))
+        A = np.dot((np.eye(n) - np.dot(col, col.T) / col_norms[col_ind]), A)
+
+    print >>sys.stderr, cols
+    return cols
+
 class SVDSelect(MatrixHandler):
-    def __init__(self, blocksize=3, isreducer=False, isfinal=False):
+    def __init__(self, blocksize=3, isreducer=False, isfinal=False, rank=6):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
         self.isreducer = isreducer
         self.isfinal = isfinal
         self.data = []
+        self.rank = rank
     
     def QR(self):
         return np.linalg.qr(np.array(self.data),'r')
     
     def compress(self):
         # Compute a QR factorization on the data accumulated so far.
-        if self.ncols is None or len(self.data) < self.ncols:
+        if self.ncols == None or len(self.data) < self.ncols:
             return
 
         t0 = time.time()
@@ -486,19 +501,25 @@ class SVDSelect(MatrixHandler):
             self.counters['rows processed'] += 50000
 
     def compute_extreme_pts(self):
-        _, S, V = np.linalg.svd(np.array(self.data))
-        self.data = []
-        A = S * V
-        r = 6
-        epsilon = 1e-1
-        cols = HottTopixx(np.array(A), epsilon, r)
+        _, S, Vt = np.linalg.svd(np.array(self.data))
+        self.cols = []
+        A = np.dot(np.diag(S), Vt)
+        cols = SPA(np.copy(A), self.rank)
         for col in cols:
-            self.data.append(col)
+            self.cols.append(col)
+
+        self.H = np.zeros((len(self.cols), self.ncols))
+        for i in xrange(self.ncols):
+            sol, res = optimize.nnls(A[:, self.cols], A[:, i])
+            print >>sys.stderr, res
+            self.H[:, i] = sol
+        self.rel_err = np.linalg.norm(A - np.dot(A[:, self.cols], self.H), 'fro')
+        print >>sys.stderr, 'true residual: ' + str(self.rel_err)
 
     def multicollect(self, key, value):
         """ Collect multiple rows at once with a single key. """
         nkeys = len(value)
-        newkey = ('multi',nkeys,key)
+        newkey = ('multi', nkeys, key)
         
         self.keys.append(newkey)
         
@@ -508,11 +529,22 @@ class SVDSelect(MatrixHandler):
     def close(self):
         self.counters['rows processed'] += self.nrows % 50000
         self.compress()
+
         if self.isreducer and self.isfinal:
             self.compute_extreme_pts()
-        for i, row in enumerate(self.data):
-            key = np.random.randint(0, 4000000000)
-            yield key, row
+            # emit extreme columns
+            for i, col in enumerate(self.cols):
+                yield 'col_' + str(i), col
+            # emit H and relative error
+            for i, row in enumerate(self.H):
+                yield 'H_' + str(i), row
+            yield 'rel_err', self.rel_err
+
+        else:
+            for i, row in enumerate(self.data):
+                key = np.random.randint(0, 4000000000)
+                yield key, row
+            
 
     def __call__(self, data):
         if not self.isreducer:
