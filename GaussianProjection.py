@@ -29,7 +29,8 @@ def runner(job):
         else:
             mapper = mrnmf.ID_MAPPER
             # TODO: Make the target rank an argument
-            reducer = mrnmf.ProjectionReducer(rank)
+            # reducer = mrnmf.ProjectionReducer(rank)
+            reducer = mrnmf.ArraySumReducer()
             nreducers = 1
         job.additer(mapper=mapper, reducer=reducer,
                     opts=[('numreducetasks', str(nreducers))])

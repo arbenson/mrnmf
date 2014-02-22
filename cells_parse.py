@@ -13,8 +13,8 @@ with open('cells_example_1.txt', 'w') as f:
 		row = [str(v) for v in row]
 		f.write(' '.join(row) + '\n')
 
-with open('cells_example_1_40k.txt', 'w') as f:
+with open('cells_example_1_30k.txt', 'w') as f:
 	for i, row in enumerate(mat):
-		if i >= 40000: continue
+		if i >= 30000: continue
 		row = [str(v) for v in row]
 		f.write(' '.join(row) + '\n')

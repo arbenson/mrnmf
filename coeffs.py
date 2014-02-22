@@ -24,7 +24,18 @@ for i in xrange(r):
 		if i - j == 0:
 			Hprime[i, j] = 0.
 		else:
-			Hprime[i, j] = math.sqrt(i ** 2 + j ** 2) * 0.1
+			Hprime[i, j] = math.sqrt(i ** 2 + j ** 2)
+for i in xrange(n-r):
+	Hprime[:, i] = (Hprime[:, i] / np.linalg.norm(Hprime[:, i], 1))
+
+#with open('Hprime_20_200.txt', 'w') as f:
+#	for row in Hprime:
+#		row = [str(v) for v in row]
+#		f.write(' '.join(row) + '\n')
+
+Hprime = np.random.random((r, n-r))
+#for i in xrange(n-r):
+#	Hprime[:, i] = (Hprime[:, i] / np.linalg.norm(Hprime[:, i], 1))
 
 with open('Hprime_20_200.txt', 'w') as f:
 	for row in Hprime:

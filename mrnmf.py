@@ -95,6 +95,7 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
 
     def collect_data_instance(self, key, value):
         if isinstance(value, str):
+            print >>sys.stderr, 'its a string'
             if not self.deduced:
                 self.deduced = self.deduce_string_type(value)
                 # handle conversion from string
@@ -102,6 +103,7 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
                 value = self.unpacker.unpack(value)
             else:
                 value = [float(p) for p in value.split()]
+        # check for numpy 2d array
         elif isinstance(value, np.ndarray):
             # verify column size
             if value.ndim == 2:
@@ -117,6 +119,18 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
                 return
             else:
                 value = value.tolist() # convert and continue below
+        # check for list of lists
+        elif isinstance(value, list):
+            if len(value) > 0 and isinstance(value[0], list):
+                if self.ncols == None:
+                    self.ncols = len(value[0])
+                    print >>sys.stderr, 'Matrix size: %i columns' % (self.ncols)
+                if len(value[0]) != self.ncols:
+                    raise DataFormatException(
+                        'Number of columns in value did not match number of columns in matrix')
+                for row in value:
+                    self.collect_data_instance(key, row)
+                return
 
         if self.ncols == None:
             self.ncols = len(value)
@@ -385,9 +399,6 @@ class NNLSMapper2(MatrixHandler):
         print >>sys.stderr, 'singular values: ' + str(s)
         for row in self.WTW:
             print >> sys.stderr, str(row)
-
-        
-
         
     def collect(self, key, value):
         sol, res = optimize.nnls(self.WTW, value)
@@ -401,65 +412,6 @@ class NNLSMapper2(MatrixHandler):
         # finally, output data
         for key, val in self.data:
             yield key, val
-
-
-def HottTopixx(M, epsilon, r):
-    # Treating variables in X row-major
-    n = M.shape[1]
-    p = np.random.random((n, 1))
-    c = matrix(np.kron(p, np.eye(n, 1)))
-    
-    # tr(X) = r
-    A = matrix(np.kron(np.ones((1, n)), np.array(([1] + [0] * (n-1)))))
-    b = matrix([float(r)]) # need float cast
-    
-    # X(i, i) \le 1 for all i
-    G1 = np.zeros((n, n * n))
-    for i in xrange(n):
-        G1[i, n * i] = 1
-    h1 = np.ones((n, 1))
-    
-    # X(i, j) \le X(i, i) for all i, j
-    G2 = np.kron(np.eye(n), np.hstack((-np.ones((n-1, 1)), np.eye(n-1))))
-    h2 = np.zeros(((n-1) * n, 1))
-    
-    # X(i, j) \ge 0 for all i, j
-    G3 = -np.eye(n * n)
-    h3 = np.zeros((n * n, 1))
-    
-    # \| M - MX \|_1 \le 2\epsilon
-    # We are not going to assume that M is nonnegative, so we
-    # turn the one norm constraint into two sets of constraints.
-    m = M.shape[0]
-    G4 = np.kron(-M, np.ones((1, n)))
-    h4 = np.reshape(-np.sum(M, axis=1) + 2 * epsilon, (m, 1))
-    G5 = np.kron(M, np.ones((1, n)))
-    h5 = np.reshape(np.sum(M, axis=1) + 2 * epsilon, (m, 1))
-    
-    # min c^Ty
-    # s.t. Gy + s = h
-    #      Ay = b
-    #      s \ge 0
-    G = matrix(np.vstack((G1, G2, G3, G4, G5)))
-    h = matrix(np.vstack((h1, h2, h3, h4, h5)))
-    print >>sys.stderr, G.size
-    print >>sys.stderr, h.size
-    X = np.reshape(np.array(solvers.lp(c, G, h, A=A, b=b)['x']), (n, n))
-    return list(np.argsort(np.diag(X))[-r:])
-
-def SPA(A, r):
-    cols = []
-    m, n = A.shape
-    assert(m == n)
-    for _ in xrange(r):
-        col_norms = np.sum(np.abs(A) ** 2, axis=0)
-        col_ind = np.argmax(col_norms)
-        cols.append(col_ind)
-        col = np.reshape(A[:, col_ind], (n, 1))
-        A = np.dot((np.eye(n) - np.dot(col, col.T) / col_norms[col_ind]), A)
-
-    print >>sys.stderr, cols
-    return cols
 
 class SVDSelect(MatrixHandler):
     def __init__(self, blocksize=3, isreducer=False, isfinal=False, rank=6):
@@ -556,6 +508,77 @@ class SVDSelect(MatrixHandler):
         for key, val in self.close():
             yield key, val
 
+class SerialTSQR(MatrixHandler):
+    def __init__(self, blocksize=3, isreducer=False, isfinal=False, rank=6):
+        MatrixHandler.__init__(self)
+        self.blocksize = blocksize
+        self.isreducer = isreducer
+        self.isfinal = isfinal
+        self.data = []
+    
+    def QR(self):
+        return np.linalg.qr(np.array(self.data),'r')
+    
+    def compress(self):
+        # Compute a QR factorization on the data accumulated so far.
+        if self.ncols == None or len(self.data) < self.ncols:
+            return
+
+        t0 = time.time()
+        R = self.QR()
+        dt = time.time() - t0
+        self.counters['numpy time (millisecs)'] += int(1000 * dt)
+
+        # reset data and re-initialize to R
+        self.data = []
+        for row in R:
+            self.data.append(util.array2list(row))
+                        
+    def collect(self, key, value):
+        self.data.append(value)
+        self.nrows += 1
+        
+        if len(self.data) > self.blocksize * self.ncols:
+            self.counters['QR Compressions'] += 1
+            self.compress()
+            
+        # write status updates so Hadoop doesn't complain
+        if self.nrows % 50000 == 0:
+            self.counters['rows processed'] += 50000
+
+    def multicollect(self, key, value):
+        """ Collect multiple rows at once with a single key. """
+        nkeys = len(value)
+        newkey = ('multi', nkeys, key)
+        
+        self.keys.append(newkey)
+        
+        for row in value:
+            self.add_row(row.tolist())
+
+    def close(self):
+        self.counters['rows processed'] += self.nrows % 50000
+        self.compress()
+
+        if self.isreducer and self.isfinal:
+            for i, row in enumerate(self.data):
+                yield i, row
+        else:
+            for i, row in enumerate(self.data):
+                key = np.random.randint(0, 4000000000)
+                yield key, row
+            
+
+    def __call__(self, data):
+        if not self.isreducer:
+            self.collect_data(data)
+        else:
+            for key, values in data:
+                self.collect_data(values, key)
+
+        for key, val in self.close():
+            yield key, val
+
 class ColSumsMap(MatrixHandler):
     def __init__(self):
         MatrixHandler.__init__(self)
@@ -593,7 +616,7 @@ class ColScale(MatrixHandler):
 
     def compress(self):        
         # Compute the matmul on the data accumulated so far
-        if self.ncols is None or len(self.data) == 0:
+        if self.ncols == None or len(self.data) == 0:
             return
 
         self.counters['MatMul compression'] += 1

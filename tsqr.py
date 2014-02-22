@@ -16,7 +16,7 @@ David F. Gleich
 Copyright (c) 2013
 """
 
-import mrmc
+import mrnmf
 import dumbo
 import util
 import os
@@ -32,9 +32,9 @@ def runner(job):
     for i,part in enumerate(schedule):
         isfinal = (i == len(schedule) - 1)
         nreducers = int(part)
-        mapper = mrmc.SerialTSQR(blocksize=blocksize, isreducer=False,
+        mapper = mrnmf.SerialTSQR(blocksize=blocksize, isreducer=False,
                                  isfinal=isfinal)
-        reducer = mrmc.SerialTSQR(blocksize=blocksize, isreducer=True,
+        reducer = mrnmf.SerialTSQR(blocksize=blocksize, isreducer=True,
                                   isfinal=isfinal)
         job.additer(mapper=mapper,reducer=reducer,
                     opts = [('numreducetasks', str(nreducers))])    
@@ -46,7 +46,7 @@ def starter(prog):
     gopts.getintkey('blocksize',3)
     gopts.getstrkey('reduce_schedule','1')
 
-    mat = mrmc.starter_helper(prog)
+    mat = mrnmf.starter_helper(prog)
     if not mat: return "'mat' not specified"
     
     matname,matext = os.path.splitext(mat)

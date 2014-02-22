@@ -28,17 +28,20 @@ class Map:
 
   def __call__(self, key, value):
 	  m = 200
-	  n = 320
-	  r = 40
-	  #epsilon = 1e-3
-	  epsilon = 0
+	  n = 200
+	  r = 20
+	  epsilon = 1e-3
+	  #epsilon = 0
 
 	  W = np.random.random((m, r))
 	  M = np.dot(W, np.hstack((np.eye(r), self.Hprime)))
 	  # permutation of columns
-	  P1 = np.arange(0, n, n / r)
-	  P2 = [x for x in np.arange(0, n) if x not in P1]
-	  P = list(P1) + P2
+	  P = range(n)
+	  for i in xrange(r):
+		  P[i], P[i * (n / r)] = P[i * (n / r)], P[i]
+	  #P1 = np.arange(0, n, n / r)
+	  #P2 = [x for x in np.arange(0, n) if x not in P1]
+	  #P = list(P1) + P2
 	  M = M[:, P]
 
 	  # Add noise
@@ -52,7 +55,7 @@ class Map:
 
 def runner(job):
     options=[('numreducetasks', '0'), ('nummaptasks', '40')]
-    job.additer(mapper=Map('Hprime_40_320.txt'), reducer=mrnmf.ID_REDUCER, opts=options)
+    job.additer(mapper=Map('Hprime_20_200.txt'), reducer=mrnmf.ID_REDUCER, opts=options)
 
 def starter(prog):
     print "running starter!"
@@ -71,7 +74,7 @@ def starter(prog):
 
     prog.addopt('file',os.path.join(mypath,'util.py'))
     prog.addopt('file',os.path.join(mypath,'mrnmf.py'))
-    prog.addopt('file',os.path.join(mypath,'Hprime_40_320.txt'))
+    prog.addopt('file',os.path.join(mypath,'Hprime_20_200.txt'))
 
     prog.addopt('input', mat)
     matname,matext = os.path.splitext(mat)
