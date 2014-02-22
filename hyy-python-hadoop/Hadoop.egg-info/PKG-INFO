@@ -1,0 +1,10 @@
+Metadata-Version: 1.0
+Name: Hadoop
+Version: 0.2
+Summary: Python Hadoop I/O Utilities
+Home-page: http://hadoop.apache.org
+Author: Matteo Bertozzi & Yangyang Hou
+Author-email: theo.bertozzi@gmail.com & hyy.sun@gmail.com
+License: Apache Software License 2.0 (ASF)
+Description: UNKNOWN
+Platform: UNKNOWN
