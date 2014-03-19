@@ -1,5 +1,12 @@
 #!/usr/bin/env dumbo
 
+'''
+Form the Kronecker product of the Flow Cytometry data matrix.
+
+Example call:
+   dumbo start FC_kron.py -hadoop icme-hadoop1
+'''
+
 import sys
 import os
 import time
@@ -19,20 +26,16 @@ gopts = util.GlobalOptions()
 
 class Map:
   def __init__(self):
-      #self.max_key = 40000
       self.mat = []
-      with open('cells_example_1_40k.txt', 'r') as f:
+      with open('FC_40k.txt', 'r') as f:
           for line in f:
               row = [float(v) for v in line.split()]
               self.mat.append(row)
 
       self.mat = np.array(self.mat)
-      #self.mat = self.mat[:self.max_key, :]
       print >>sys.stderr, self.mat.shape
 
   def __call__(self, key, value):
-      #if key > self.max_key:
-      #    return
       value = [float(v) for v in value]
       split_size = 1000
       total = self.mat.shape[0] / split_size
@@ -45,11 +48,6 @@ class Map:
           keys = [split_size * j + i + 1 for i in xrange(B.shape[0])]
           key = (key, keys)
           yield key, B.tolist()
-          #for i, row in enumerate(B):
-          #    key = [key, split_size * j + i + 1]
-          #    val = [float(v) for v in row]
-          #    print >>sys.stderr, len(val)
-          #    yield key, struct.pack('d' * len(val), *val)
 
 def runner(job):
     options=[('numreducetasks', '0'), ('nummaptasks', '40')]
@@ -72,7 +70,7 @@ def starter(prog):
 
     prog.addopt('file',os.path.join(mypath,'util.py'))
     prog.addopt('file',os.path.join(mypath,'mrnmf.py'))
-    prog.addopt('file',os.path.join(mypath,'cells_example_1_40k.txt'))
+    prog.addopt('file',os.path.join(mypath,'FC_40k.txt'))
 
     prog.addopt('input', mat)
     matname,matext = os.path.splitext(mat)
