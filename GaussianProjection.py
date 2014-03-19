@@ -1,8 +1,10 @@
 #!/usr/bin/env dumbo
 
 """
+Driver script for Gaussian Projection.
+
 Austin R. Benson
-Copyright (c) 2013
+Copyright (c) 2014
 """
 
 import dumbo
@@ -17,19 +19,18 @@ gopts = util.GlobalOptions()
     
 def runner(job):
     blocksize = gopts.getintkey('blocksize')
-    rank = gopts.getintkey('rank')
+    projsize = gopts.getintkey('projsize')
     schedule = gopts.getstrkey('reduce_schedule')
     
     schedule = schedule.split(',')
     for i,part in enumerate(schedule):
         nreducers = int(part)
         if i == 0:
-            mapper = mrnmf.GaussianReduction(blocksize=blocksize)
+            mapper = mrnmf.GaussianReduction(blocksize=blocksize,
+											 projsize=projsize)
             reducer = mrnmf.ArraySumReducer()
         else:
             mapper = mrnmf.ID_MAPPER
-            # TODO: Make the target rank an argument
-            # reducer = mrnmf.ProjectionReducer(rank)
             reducer = mrnmf.ArraySumReducer()
             nreducers = 1
         job.additer(mapper=mapper, reducer=reducer,
@@ -40,7 +41,7 @@ def starter(prog):
     gopts.prog = prog
     
     gopts.getintkey('blocksize', 3)
-    gopts.getintkey('rank', 10)
+    gopts.getintkey('projsize', 400)
     gopts.getstrkey('reduce_schedule', '1')
 
     mat = mrnmf.starter_helper(prog)
