@@ -12,7 +12,7 @@ Example usage:
 
 
 Austin R. Benson (arbenson@stanford.edu)
-Copyright (c) 2013
+Copyright (c) 2014
 """
 
 import mrnmf

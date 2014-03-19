@@ -11,8 +11,6 @@ import time
 import random
 import struct
 
-#from cvxopt import matrix, solvers
-
 import util
 import dumbo
 import dumbo.backends.common
@@ -245,7 +243,7 @@ class ArraySumReducer(MatrixHandler):
             yield key, self.row_sums[key]
 
 class SerialTSQR(MatrixHandler):
-    def __init__(self, blocksize=3, isreducer=False, isfinal=False, rank=6):
+    def __init__(self, blocksize=3, isreducer=False, isfinal=False):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
         self.isreducer = isreducer

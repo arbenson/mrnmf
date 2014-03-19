@@ -39,9 +39,6 @@ class Map:
 	  P = range(n)
 	  for i in xrange(r):
 		  P[i], P[i * (n / r)] = P[i * (n / r)], P[i]
-	  #P1 = np.arange(0, n, n / r)
-	  #P2 = [x for x in np.arange(0, n) if x not in P1]
-	  #P = list(P1) + P2
 	  M = M[:, P]
 
 	  # Add noise
