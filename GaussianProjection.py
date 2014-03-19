@@ -16,6 +16,7 @@ import mrnmf
 
 # create the global options structure
 gopts = util.GlobalOptions()
+
     
 def runner(job):
     blocksize = gopts.getintkey('blocksize')
@@ -26,15 +27,26 @@ def runner(job):
     for i,part in enumerate(schedule):
         nreducers = int(part)
         if i == 0:
-            mapper = mrnmf.GaussianReduction(blocksize=blocksize,
-											 projsize=projsize)
-            reducer = mrnmf.ArraySumReducer()
+            mapper = mrnmf.NMFMap(blocksize=blocksize,
+								  projsize=projsize,
+								  compute_GP=True,
+								  compute_QR=True,
+								  compute_colsums=True)
+            reducer = mrnmf.NMFReduce(blocksize=blocksize,
+									  isfinal=False)
         else:
             mapper = mrnmf.ID_MAPPER
-            reducer = mrnmf.ArraySumReducer()
+            reducer = mrnmf.NMFReduce(blocksize=blocksize,
+									  isfinal=True)
             nreducers = 1
         job.additer(mapper=mapper, reducer=reducer,
                     opts=[('numreducetasks', str(nreducers))])
+	
+	# Add a pass where we just separate the data
+	job.additer(mapper=mrnmf.ID_MAPPER,
+				reducer=mrnmf.NMFParse(),
+				opts=[('numreducetasks', '1')])
+
 
 def starter(prog):
     # set the global opts    
@@ -50,7 +62,7 @@ def starter(prog):
     matname,matext = os.path.splitext(mat)
     output = prog.getopt('output')
     if not output:
-        prog.addopt('output','%s-proj%s'%(matname,matext))
+        prog.addopt('output','%s-proj%s' % (matname, matext))
 
     gopts.save_params()
 

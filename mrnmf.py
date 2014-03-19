@@ -93,7 +93,6 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
 
     def collect_data_instance(self, key, value):
         if isinstance(value, str):
-            print >>sys.stderr, 'its a string'
             if not self.deduced:
                 self.deduced = self.deduce_string_type(value)
                 # handle conversion from string
@@ -168,37 +167,74 @@ class MatrixHandler(dumbo.backends.common.MapRedBase):
                                           + ' is not a multiple of 8.')
         return True
 
-class GaussianProjection(MatrixHandler):
-    def __init__(self, blocksize=5, projsize=400):
+class NMFMap(MatrixHandler):
+    def __init__(self, blocksize=5, projsize=400,
+                 compute_GP=True,
+                 compute_QR=True,
+                 compute_colsums=True):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
+
+        self.compute_GP = compute_GP
         self.data = []
         self.projsize = projsize
         self.A_curr = None
+
+        self.compute_QR = compute_QR
+        if compute_QR:
+            self.qr_data = []
+
+        self.compute_colsums = compute_colsums
+        self.colsums = None
+
+
+    def QR(self):
+        data = np.array(self.data)
+        if len(self.qr_data) > 0:
+            data = np.vstack((np.array(self.qr_data), data))
+        return np.linalg.qr(data, 'r')
     
     def compress(self):
         if self.ncols is None or len(self.data) == 0:
             return
 
-        t0 = time.time()
-        G = np.random.randn(self.projsize, len(self.data)) / 100.
-        A_flush = G * np.mat(self.data)
-        dt = time.time() - t0
-        self.counters['numpy time (millisecs)'] += int(1000 * dt)
+        if self.compute_GP:
+            t0 = time.time()
+            G = np.random.randn(self.projsize, len(self.data)) / 100.
+            A_flush = G * np.mat(self.data)
+            dt = time.time() - t0
+            self.counters['numpy time (millisecs)'] += int(1000 * dt)
 
-        # Add flushed update to local copy
-        if self.A_curr == None:
-            self.A_curr = A_flush
-        else:
-            self.A_curr += A_flush
+            # Add flushed update to local copy
+            if self.A_curr == None:
+                self.A_curr = A_flush
+            else:
+                self.A_curr += A_flush
+
+        if self.compute_QR:
+            t0 = time.time()
+            R = self.QR()
+            dt = time.time() - t0
+            self.counters['numpy time (millisecs)'] += int(1000 * dt)
+            # reset data and re-initialize to R
+            self.qr_data = []
+            for row in R:
+                self.qr_data.append(util.array2list(row))
+
         self.data = []
                         
     def collect(self, key, value):
         self.data.append(value)
         self.nrows += 1
         
+        if self.compute_colsums:
+            if self.colsums == None:
+                self.colsums = np.array(value)
+            else:
+                self.colsums += np.array(value)
+
         if len(self.data) > self.blocksize * self.ncols:
-            self.counters['Gaussian compressions'] += 1
+            self.counters['compressions'] += 1
             # compress the data
             self.compress()
             
@@ -209,9 +245,20 @@ class GaussianProjection(MatrixHandler):
     def close(self):
         self.counters['rows processed'] += self.nrows % 50000
         self.compress()
-        if self.A_curr is not None:
-            for ind, row in enumerate(self.A_curr.getA()):
-                yield ind, util.array2list(row)
+
+        if self.compute_GP:
+            if self.A_curr != None:
+                for ind, row in enumerate(self.A_curr.getA()):
+                    yield ('GP', ind), util.array2list(row)
+        
+        if self.compute_QR:
+            for i, row in enumerate(self.qr_data):
+                key = np.random.randint(0, 4000000000)
+                yield ('QR', key), row
+
+        if self.compute_colsums:
+            for ind, val in enumerate(self.colsums):
+                yield ('colsums', ind), val
 
     def __call__(self, data):
         self.collect_data(data)
@@ -220,39 +267,19 @@ class GaussianProjection(MatrixHandler):
         for key, val in self.close():
             yield key, val
 
-class ArraySumReducer(MatrixHandler):
-    def __init__(self):
+class NMFReduce(MatrixHandler):
+    def __init__(self, blocksize=3, isfinal=False):
         MatrixHandler.__init__(self)
-        self.row_sums = {}
-
-    def collect(self, key, value):
-        if key not in self.row_sums:
-            self.row_sums[key] = value
-        else:
-            if len(value) != len(self.row_sums[key]):
-                print >>sys.stderr, 'value: ' + str(value)
-                print >>sys.stderr, 'value: ' + str(self.row_sums[key])
-                raise DataFormatException('Differing array lengths for summing')
-            for k in xrange(len(self.row_sums[key])):
-                self.row_sums[key][k] += value[k]
-    
-    def __call__(self, data):
-        for key, values in data:
-            self.collect_data(values, key)
-        for key in self.row_sums:
-            yield key, self.row_sums[key]
-
-class SerialTSQR(MatrixHandler):
-    def __init__(self, blocksize=3, isreducer=False, isfinal=False):
-        MatrixHandler.__init__(self)
-        self.blocksize = blocksize
-        self.isreducer = isreducer
-        self.isfinal = isfinal
+        self.rowsums = {}
+        self.colsums = {}
         self.data = []
-    
+        self.blocksize = blocksize
+        self.ncols = None
+        self.isfinal = isfinal
+
     def QR(self):
-        return np.linalg.qr(np.array(self.data),'r')
-    
+        return np.linalg.qr(np.array(self.data), 'r')
+
     def compress(self):
         # Compute a QR factorization on the data accumulated so far.
         if self.ncols == None or len(self.data) < self.ncols:
@@ -261,133 +288,76 @@ class SerialTSQR(MatrixHandler):
         t0 = time.time()
         R = self.QR()
         dt = time.time() - t0
-        self.counters['numpy time (millisecs)'] += int(1000 * dt)
 
         # reset data and re-initialize to R
         self.data = []
         for row in R:
             self.data.append(util.array2list(row))
-                        
-    def collect(self, key, value):
-        self.data.append(value)
-        self.nrows += 1
-        
-        if len(self.data) > self.blocksize * self.ncols:
-            self.counters['QR Compressions'] += 1
-            self.compress()
-            
-        # write status updates so Hadoop doesn't complain
-        if self.nrows % 50000 == 0:
-            self.counters['rows processed'] += 50000
 
-    def multicollect(self, key, value):
-        """ Collect multiple rows at once with a single key. """
-        nkeys = len(value)
-        newkey = ('multi', nkeys, key)
-        
-        self.keys.append(newkey)
-        
-        for row in value:
-            self.add_row(row.tolist())
+    def handle_GP(self, key, value):
+        if key not in self.rowsums:
+            self.rowsums[key] = value
+        else:
+            if len(value) != len(self.rowsums[key]):
+                print >>sys.stderr, 'value: ' + str(value)
+                print >>sys.stderr, 'value: ' + str(self.rowsums[key])
+                raise DataFormatException('Differing array lengths for summing')
+            for k in xrange(len(self.rowsums[key])):
+                self.rowsums[key][k] += value[k]
+
+    def handle_QR(self, key, value):
+        if self.ncols == None:
+            self.ncols = len(value)
+        self.data.append(value)
+        if len(self.data) > self.blocksize * self.ncols:
+            self.compress()
+
+    def handle_colsums(self, key, values):
+        self.colsums[key] = sum(values)
 
     def close(self):
-        self.counters['rows processed'] += self.nrows % 50000
         self.compress()
 
-        if self.isreducer and self.isfinal:
+        # Emit row sums for GP
+        for key in self.rowsums:
+            yield ('GP', key), self.rowsums[key]
+
+        # Emit R factor of QR
+        if self.isfinal:
             for i, row in enumerate(self.data):
-                yield i, row
+                yield ('QR', i), row
         else:
             for i, row in enumerate(self.data):
                 key = np.random.randint(0, 4000000000)
-                yield key, row
-            
+                yield ('QR', key), row
+
+        # Emit column sums
+        for key in self.colsums:
+            yield ('colsums', key), self.colsums[key]
 
     def __call__(self, data):
-        if not self.isreducer:
-            self.collect_data(data)
-        else:
-            for key, values in data:
-                self.collect_data(values, key)
+        for key, values in data:
+            if key[0] == 'GP':
+                for val in values:
+                    self.handle_GP(key[1], val)
+            elif key[0] == 'QR':
+                for val in values:
+                    self.handle_QR(key[1], val)
+            elif key[0] == 'colsums':
+                self.handle_colsums(key[1], values)
+            else:
+                raise DataFormatException('unknown key type: %s' % str(key[0]))
 
         for key, val in self.close():
             yield key, val
 
-class ColSumsMap(MatrixHandler):
-    def __init__(self):
-        MatrixHandler.__init__(self)
-        self.data = {}
-    
-    def collect(self, key, value):
-        for col, v in enumerate(value):
-            if col in self.data:
-                self.data[col] += v
-            else:
-                self.data[col] = v
-
-
-    def __call__(self, data):
-        self.collect_data(data)
-
-        for key in self.data:
-            yield key, self.data[key]
-
-class ColSumsRed():
+@opt("getpath", "yes")
+class NMFParse():
     def __init__(self):
         pass
 
     def __call__(self, data):
         for key, values in data:
-            yield key, sum(values)
-
-class ColScale(MatrixHandler):
-    def __init__(self, cols, blocksize=3):
-        MatrixHandler.__init__(self)        
-        self.blocksize = blocksize
-        self.data = []
-        self.keys = []
-        self.small = np.mat(np.linalg.inv(np.diag(cols)))
-
-    def compress(self):        
-        # Compute the matmul on the data accumulated so far
-        if self.ncols == None or len(self.data) == 0:
-            return
-
-        self.counters['MatMul compression'] += 1
-
-        t0 = time.time()
-        A = np.mat(self.data)
-        out_mat = A * self.small
-        dt = time.time() - t0
-        self.counters['numpy time (millisecs)'] += int(1000 * dt)
-
-        # reset data and add flushed update to local copy
-        self.data = []
-        for i, row in enumerate(out_mat.getA()):
-            yield self.keys[i], struct.pack('d' * len(row), *row)
-
-        # clear the keys
-        self.keys = []
-    
-    def collect(self, key, value):
-        self.keys.append(key)
-        self.data.append(value)
-        self.nrows += 1
-        
-        # write status updates so Hadoop doesn't complain
-        if self.nrows%50000 == 0:
-            self.counters['rows processed'] += 50000
-
-    def __call__(self, data):
-        for key,value in data:
-            self.collect_data_instance(key, value)
-
-            # if we accumulated enough rows, output some data
-            if len(self.data) >= self.blocksize * self.ncols:
-                for key, val in self.compress():
-                    yield key, val
-                    
-        # output data the end of the data
-        for key, val in self.compress():
-            yield key, val
+            for val in values:
+                yield key, val
 
