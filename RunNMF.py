@@ -1,7 +1,7 @@
 #!/usr/bin/env dumbo
 
 """
-Driver script for Gaussian Projection.
+Driver script for NMF.
 
 Austin R. Benson
 Copyright (c) 2014
@@ -20,6 +20,9 @@ gopts = util.GlobalOptions()
     
 def runner(job):
     blocksize = gopts.getintkey('blocksize')
+	compute_GP = gopts.getboolkey('gp')
+	compute_QR = gopts.getboolkey('qr')
+	compute_colsums = gopts.getboolkey('colsums')
     projsize = gopts.getintkey('projsize')
     schedule = gopts.getstrkey('reduce_schedule')
     
@@ -28,31 +31,33 @@ def runner(job):
         nreducers = int(part)
         if i == 0:
             mapper = mrnmf.NMFMap(blocksize=blocksize,
-								  projsize=projsize,
-								  compute_GP=True,
-								  compute_QR=True,
-								  compute_colsums=True)
+                                  projsize=projsize,
+                                  compute_GP=True,
+                                  compute_QR=True,
+                                  compute_colsums=True)
             reducer = mrnmf.NMFReduce(blocksize=blocksize,
-									  isfinal=False)
+                                      isfinal=False)
         else:
             mapper = mrnmf.ID_MAPPER
             reducer = mrnmf.NMFReduce(blocksize=blocksize,
-									  isfinal=True)
+                                      isfinal=True)
             nreducers = 1
         job.additer(mapper=mapper, reducer=reducer,
                     opts=[('numreducetasks', str(nreducers))])
-	
-	# Add a pass where we just separate the data
-	job.additer(mapper=mrnmf.ID_MAPPER,
-				reducer=mrnmf.NMFParse(),
-				opts=[('numreducetasks', '1')])
+    
+    # Add a pass where we just separate the data
+    job.additer(mapper=mrnmf.ID_MAPPER,
+                reducer=mrnmf.NMFParse(),
+                opts=[('numreducetasks', '1')])
 
 
 def starter(prog):
     # set the global opts    
     gopts.prog = prog
-    
     gopts.getintkey('blocksize', 3)
+	gopts.getboolkey('gp', True)
+	gopts.getboolkey('qr', True)
+	gopts.getboolkey('colsums', True)
     gopts.getintkey('projsize', 400)
     gopts.getstrkey('reduce_schedule', '1')
 
