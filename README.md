@@ -79,12 +79,6 @@ Copy the data locally and look at the output.
      dumbo cat small.out/colnorms -hadoop $HADOOP_INSTALL > small.out-colnorms.txt
      cat small.out-colnorms.txt
      
-Compute _H_, visualize residuals, and visualize column selection when r = 4:
-
-     cd plotting
-     python small_example_plots.py
-
-
 
 Contact
 --------
