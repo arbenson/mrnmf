@@ -16,18 +16,7 @@ import dumbo
 import dumbo.backends.common
 from dumbo import opt
 
-# TODO (arbenson): This is a total hack.
-os.environ['PYTHON_EGG_CACHE'] = 'egg_cache'
 import numpy as np
-try:
-    from scipy import optimize
-except:
-    print >>sys.stderr, 'Missing SciPy'
-try:
-    from cvxopt import matrix, solvers
-except:
-    print >>sys.stderr, 'Missing cvxopt'
-
 
 # some variables
 ID_MAPPER = 'org.apache.hadoop.mapred.lib.IdentityMapper'
@@ -48,12 +37,6 @@ def starter_helper(prog):
 
     prog.addopt('file', os.path.join(mypath, 'util.py'))
     prog.addopt('file', os.path.join(mypath, 'mrnmf.py'))
-
-    for egg in ['/home/arbenson/hadoop_env/scipy-0.13.0/dist/scipy-0.13.0-py2.6-linux-x86_64.egg',
-                '/home/arbenson/hadoop_env/numpy-1.8.0/dist/numpy-1.8.0-py2.6-linux-x86_64.egg',
-                '/home/arbenson/hadoop_env/cvxopt/dist/cvxopt-1.1.6-py2.6-linux-x86_64.egg']:
-        prog.addopt('libegg', egg)
-        prog.addopt('file', egg)
 
     splitsize = prog.delopt('split_size')
     if splitsize is not None:
