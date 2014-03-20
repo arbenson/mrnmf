@@ -15,8 +15,7 @@ we are interested in a separable nonnegative matrix factorization:
 where _X(:, K)_ is some permuted column subset of _X_ with _|K|_ columns,
 and _H_ is _|K|_ x _n_ with nonnegative entries.
 
-If you use this cose in a publication, please cite:
-
+If you use this code in a publication, please cite:
 Benson, Austin R., Lee, Jason D., Rajwa, Bartek, and Gleich, David F.
 "Scalable methods for nonnegative matrix factorizations of near-separable tall-and-skinny matrices."
 arXiv preprint arXiv:1402.6964 (2014).
