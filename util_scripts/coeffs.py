@@ -28,15 +28,7 @@ for i in xrange(r):
 for i in xrange(n-r):
 	Hprime[:, i] = (Hprime[:, i] / np.linalg.norm(Hprime[:, i], 1))
 
-#with open('Hprime_20_200.txt', 'w') as f:
-#	for row in Hprime:
-#		row = [str(v) for v in row]
-#		f.write(' '.join(row) + '\n')
-
 Hprime = np.random.random((r, n-r))
-#for i in xrange(n-r):
-#	Hprime[:, i] = (Hprime[:, i] / np.linalg.norm(Hprime[:, i], 1))
-
 with open('Hprime_20_200.txt', 'w') as f:
 	for row in Hprime:
 		row = [str(v) for v in row]
