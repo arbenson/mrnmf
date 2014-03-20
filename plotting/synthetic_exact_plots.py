@@ -29,7 +29,6 @@ if 1:
         cols3, H3, resid3 = compute_extreme_pts(data3, cols, 'GP', cols_path)
         rs.append((resid1, resid2, resid3))
     visualize_resids(numcols, rs, 'synth_exact_residuals')
-    '''
 
     r = 20
     # This is one of the biggest hacks I have ever done.  For some reason,
@@ -66,6 +65,6 @@ if 1:
                    ['SPA', 'XRAY', 'GP', 'Generation'],
                    'synth_exact_cols')
 
-    '''
+
 
 

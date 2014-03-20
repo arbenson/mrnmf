@@ -7,13 +7,13 @@ factorizations described in
 [Scalable methods for nonnegative matrix factorizations of near-separable tall-and-skinny matrices](http://arxiv.org/abs/1402.6964).
 The implementation uses Hadoop with Python streaming, supported by Dumbo and Feathers.
 
-Given a data matrix X of size m x n, with m >> n and nonnegative entries,
+Given a data matrix _X_ of size _m_ x _n_, with _m_ >> _n_ and nonnegative entries,
 we are interested in a separable nonnegative matrix factorization:
 
      X ~ X(:, K)H,
 
-where _X(:, K)_ is some permuted column subset of _X_ with |K| columns,
-and _H_ is |K| x n with nonnegative entries.
+where _X(:, K)_ is some permuted column subset of _X_ with _|K|_ columns,
+and _H_ is _|K|_ x _n_ with nonnegative entries.
 
 Setup
 --------
@@ -36,7 +36,7 @@ Overview
 The main Dumbo script is `RunNMF.py`.
 This script supports computing any of the following:
 
-* Gaussian projection: G * X, where G has Gaussian i.i.d. random entries
+* Gaussian projection: G * X, where _G_ has Gaussian i.i.d. random entries
 * TSQR: the R factor of X = QR
 * Column l_1 norms: | X(:, i) |_1 for each column index i
 
@@ -55,6 +55,36 @@ The parameters are:
 
 Code for plots that appear in the paper are in the plotting directory.
 There, you can find the calls to SciPy's non-negative least squares solver.
+
+Full small example
+--------
+A small noisy r-separable matrix is available in `SmallNoisySep_10k_10_4.txt`.
+The matrix has 10,000 rows, 10 columns, and a separation rank of 4 (r = 4),
+and was generated with `util_scripts/GenSyntheticSepSmall.py`.
+First, put the matrix in HDFS:
+
+     hadoop fs -put data/SmallNoisySep_10k_10_4.txt SmallNoisySep_10k_10_4.txt
+
+Next, compute the Gaussian projection, R, and column norms:
+
+     dumbo start RunNMF.py -libjar feathers.jar -hadoop $HADOOP_INSTALL \
+     -projsize 12 -reduce_schedule 2,1 -mat SmallNoisySep_10k_10_4.txt -output small.out
+
+Copy the data locally and look at the output.
+
+     dumbo cat small.out/GP -hadoop $HADOOP_INSTALL > small.out-proj.txt
+     cat small.out-proj.txt
+     dumbo cat small.out/QR -hadoop $HADOOP_INSTALL > small.out-qrr.txt
+     cat small.out-qrr.txt
+     dumbo cat small.out/colnorms -hadoop $HADOOP_INSTALL > small.out-colnorms.txt
+     cat small.out-colnorms.txt
+     
+Compute _H_, visualize residuals, and visualize column selection when r = 4:
+
+     cd plotting
+     python small_example_plots.py
+
+
 
 Contact
 --------

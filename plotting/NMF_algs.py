@@ -96,7 +96,7 @@ def parse(path):
     try:
         f = open(path, 'r')
     except:
-        # We may be expecting only the file to be distributed with the script                                                                                                                         
+        # We may be expecting only the file to be distributed with the script
         f = open(path.split('/')[-1], 'r')
     mat = f.read()
     f.close()
@@ -175,62 +175,6 @@ def SPA(A, r):
 def col2norm(A):
 	return np.sum(np.abs(A) ** 2,axis=0)
 
-def BlockNNLS(X, cols, Binit=None):
-    '''
-    Solve \arg\min_{B \ge 0} \| X - X(:, cols)B \| using the algorithm
-    in "Fast Conical Hull Algorithms for Near-separable Non-negative
-    Matrix Factorization" by Kumar et al.
-    '''
-    def objective(U, C, B):
-        obj = 0
-        for i in xrange(len(cols)):
-            if len(U.shape) == 1:
-                U = np.reshape(U, (len(U), 1))
-            obj += np.dot(U[:, i] + C[:, i], B[i, :])
-        return obj
-        
-    tol = 1e-6
-    maxcycles = 1000
-
-    if Binit == None:
-        B = np.random.random((len(cols), X.shape[1]))
-    else:
-        B = Binit
-    C = np.dot(X.T, X)
-    S = C[cols, :][:, cols]
-    if len(cols) == 1:
-        # Deal with annoying 1D arrays
-        S = np.reshape(S, (1, 1))
-    s = np.diag(S)
-    U = np.dot(B.T, S)
-    if len(cols) == 1:
-        # deal with annoying 1D arrays
-        U = np.reshape(U, (len(U), 1))
-
-    old_obj = objective(U, C, B)
-    for k in xrange(maxcycles):
-        for i in xrange(len(cols)):
-            b = B.T[:, i]
-            u = U[:, i] - s[i] * b
-            vplus = C[:, i] - u
-            for j in xrange(len(vplus)):
-                vplus[j] = max(vplus[j], 0)
-            B[i, :] = vplus / s[i]
-
-            x = B[i, :] - b
-            x = np.reshape(x, (len(x), 1))
-            y = S[i, :]
-            y = np.reshape(y, (len(y), 1))
-            U += np.dot(x, y.T)
-        new_obj = objective(U, C, B)
-        if abs(new_obj - old_obj) < tol:
-            print 'Breaking on tolerance.'
-            break
-        old_obj = new_obj
-        if k == maxcycles - 1:
-            print 'Breaking on maximum number of cycles.'
-    return B
-
 def xray(X, r):
 	cols = []
 	R = np.copy(X)
@@ -242,8 +186,6 @@ def xray(X, r):
                     break
             Ri = R[:, i]
             p = np.random.random((X.shape[0], 1))
-            #scores = np.dot(Ri.T, X) / np.dot(p.T, X)
-            #print np.dot(p.T, X)
             scores = col2norm(np.dot(R.T, X)) / col2norm(X)
             scores[cols] = -1   # IMPORTANT
             best_col = np.argmax(scores)
@@ -252,13 +194,6 @@ def xray(X, r):
                 continue
             if best_col not in cols:
                 cols.append(best_col)
-            if len(cols) > 1:
-                #Binit = np.vstack((H, np.zeros((1, H.shape[1]))))
-                # Note: this warm start doesn't actually work
-                Binit = None
-            else:
-                Binit = None
-            #H = BlockNNLS(X, cols, Binit)
             H, rel_res = NNLSFrob(X, cols)
             R = X - np.dot(X[:, cols] , H)
         return cols
