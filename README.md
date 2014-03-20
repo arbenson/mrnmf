@@ -34,6 +34,9 @@ We assume that the matrix data records in HDFS are one of the following:
 Overview
 --------
 The main Dumbo script is `RunNMF.py`.
+This is used to reduce the dimension of the problem.
+The main script for computing the columns and the
+coefficient matrix H is `NMFProcessAlgorithms.py`.
 This script supports computing any of the following:
 
 * Gaussian projection: G * X, where _G_ has Gaussian i.i.d. random entries
@@ -78,6 +81,17 @@ Copy the data locally and look at the output.
      cat small.out-qrr.txt
      dumbo cat small.out/colnorms -hadoop $HADOOP_INSTALL > small.out-colnorms.txt
      cat small.out-colnorms.txt
+
+Compute NMF with different algorithms:
+
+     python NMFProcessAlgorithms.py small.out-qrr.txt small.out-colnorms.txt 'SPA' 4
+     python NMFProcessAlgorithms.py small.out-qrr.txt small.out-colnorms.txt 'xray' 4
+     python NMFProcessAlgorithms.py small.out-proj.txt small.out-colnorms.txt 'GP' 4
+
+Since X-ray is greedy, it may not get all of the columns with the target
+separation rank set to 4:
+
+     python NMFProcessAlgorithms.py small.out-qrr.txt small.out-colnorms.txt 'xray' 5
      
 
 Contact
