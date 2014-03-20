@@ -1,4 +1,4 @@
-MapReduce Nonnegative Matrix Factorizations of near-separable tall-and-skinny matrices.
+MapReduce Nonnegative Matrix Factorizations of near-separable tall-and-skinny matrices (MRNMF).
 --------
 Austin R. Benson, Jason D. Lee, Bartek Rajwa, and David F. Gleich.
 
