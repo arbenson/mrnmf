@@ -11,7 +11,7 @@ any subset of the following:
 Assuming X is nonnegative, the column l1 norms are just the column sums.
 All of these properties are computed in one pass over the data.
 
-The script call is:
+Usage:
 
       dumbo start RunNMF.py \
       -libjar feathers.jar \
@@ -19,7 +19,7 @@ The script call is:
       -projsize [number of rows to project on for GP]
       -qr [0/1 on whether or not to compute R factor in QR factorization] \
       -colnorms [0/1 on whether or not to compute the column l1 norms] \
-      -hadoop [name of Hadoop for Dumbo to use] \
+      -hadoop $HADOOP_INSTALL \
       -reduce_schedule [comma separated list of number of reducers] \
       -mat [name of data file] \
       -output [name of output file] \

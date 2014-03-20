@@ -151,6 +151,16 @@ With the Kronecker product on HDFS, we can do dimension reduction:
 Large synthetic matrices setup
 --------
 
+The synthetic coefficient matrix used in the paper is in `data/Hprime_20_200.txt`.
+We can generate (noisy) r-separable matrices using the script `GenSyntheticSepLarge.py`.
+To generate a 200M x 200 matrix with r = 20 and noise level epsilon=1e-3:
+
+     hadoop fs -put data/Simple_1M.txt Simple_1M.txt     
+
+     dumbo start GenSyntheticSepLarge.py -hadoop $HADOOP_INSTALL \
+     -m 200 -H 'data/Hprime_20_200.txt' -epsilone 1e-3 \
+     -mat Simple_1M.txt -output Noisy_200M_200_20.bseq \
+
 Contact
 --------
-Please contact Austin Benson (arbenson@stanford.edu) for help with the code.
+Please contact Austin Benson (arbenson@stanford.edu) for help with the code, bug reports, and feature requests.

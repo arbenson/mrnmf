@@ -97,8 +97,8 @@ class GlobalOptions:
     def getintkey(self,key,default=None):
         return self._get_key(key,default,int)        
 
-    def getboolkey(self,key,default=None):
-        return self._get_key(key,default,bool)
+    def getfloatkey(self,key,default=None):
+        return self._get_key(key,default,float)
             
     def setkey(self,key,value):
         if self.prog:
