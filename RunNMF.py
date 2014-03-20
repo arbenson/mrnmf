@@ -33,11 +33,17 @@ blocksize is b, then compression occurs every nb rows.
 Example usage for the script is:
 
       dumbo start RunNMF.py -libjar feathers.jar -projsize 100 \
-      -hadoop icme-hadoop1 -reduce_schedule 40,1 \
+      -hadoop $HADOOP_INSTALL -reduce_schedule 40,1 \
       -mat cells-kron-40k.bseq -output FC_out.bseq -blocksize 10
 
-This computes (1), (2) and (3) from above for the FC data on
-ICME's Hadoop cluster.
+This computes (1), (2) and (3) from above for the data matrix
+'cells-kron-40k.bseq'.  Alternatively, we can omit the computation
+of the R factor in QR:
+
+      dumbo start RunNMF.py -libjar feathers.jar -projsize 100 \
+      -hadoop $HADOOP_INSTALL -reduce_schedule 40,1 \
+      -mat cells-kron-40k.bseq -output FC_out.bseq -blocksize 10 \
+      -qr 0
      
 
 Austin R. Benson
@@ -50,16 +56,15 @@ import sys
 import util
 import mrnmf
 
-
 # create the global options structure
 gopts = util.GlobalOptions()
 
     
 def runner(job):
     blocksize = gopts.getintkey('blocksize')
-    compute_GP = gopts.getboolkey('gp')
-    compute_QR = gopts.getboolkey('qr')
-    compute_colnorms = gopts.getboolkey('colnorms')
+    compute_GP = bool(gopts.getintkey('gp'))
+    compute_QR = bool(gopts.getintkey('qr'))
+    compute_colnorms = bool(gopts.getintkey('colnorms'))
     projsize = gopts.getintkey('projsize')
     schedule = gopts.getstrkey('reduce_schedule')
     
@@ -69,9 +74,9 @@ def runner(job):
         if i == 0:
             mapper = mrnmf.NMFMap(blocksize=blocksize,
                                   projsize=projsize,
-                                  compute_GP=True,
-                                  compute_QR=True,
-                                  compute_colnorms=True)
+                                  compute_GP=compute_GP,
+                                  compute_QR=compute_QR,
+                                  compute_colnorms=compute_colnorms)
             reducer = mrnmf.NMFReduce(blocksize=blocksize,
                                       isfinal=False)
         else:
@@ -92,9 +97,9 @@ def starter(prog):
     # set the global opts    
     gopts.prog = prog
     gopts.getintkey('blocksize', 3)
-    gopts.getboolkey('gp', True)
-    gopts.getboolkey('qr', True)
-    gopts.getboolkey('colnorms', True)
+    gopts.getintkey('gp', 1)
+    gopts.getintkey('qr', 1)
+    gopts.getintkey('colnorms', 1)
     gopts.getintkey('projsize', 400)
     gopts.getstrkey('reduce_schedule', '1')
 
