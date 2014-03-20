@@ -171,7 +171,7 @@ class NMFMap(MatrixHandler):
     def __init__(self, blocksize=5, projsize=400,
                  compute_GP=True,
                  compute_QR=True,
-                 compute_colsums=True):
+                 compute_colnorms=True):
         MatrixHandler.__init__(self)
         self.blocksize = blocksize
 
@@ -184,8 +184,8 @@ class NMFMap(MatrixHandler):
         if compute_QR:
             self.qr_data = []
 
-        self.compute_colsums = compute_colsums
-        self.colsums = None
+        self.compute_colnorms = compute_colnorms
+        self.colnorms = None
 
 
     def QR(self):
@@ -227,11 +227,11 @@ class NMFMap(MatrixHandler):
         self.data.append(value)
         self.nrows += 1
         
-        if self.compute_colsums:
-            if self.colsums == None:
-                self.colsums = np.array(value)
+        if self.compute_colnorms:
+            if self.colnorms == None:
+                self.colnorms = np.abs(np.array(value))
             else:
-                self.colsums += np.array(value)
+                self.colnorms += np.abs(np.array(value))
 
         if len(self.data) > self.blocksize * self.ncols:
             self.counters['compressions'] += 1
@@ -256,9 +256,9 @@ class NMFMap(MatrixHandler):
                 key = np.random.randint(0, 4000000000)
                 yield ('QR', key), row
 
-        if self.compute_colsums:
-            for ind, val in enumerate(self.colsums):
-                yield ('colsums', ind), val
+        if self.compute_colnorms and self.colnorms != None:
+            for ind, val in enumerate(self.colnorms):
+                yield ('colnorms', ind), val
 
     def __call__(self, data):
         self.collect_data(data)
@@ -271,11 +271,12 @@ class NMFReduce(MatrixHandler):
     def __init__(self, blocksize=3, isfinal=False):
         MatrixHandler.__init__(self)
         self.rowsums = {}
-        self.colsums = {}
+        self.colnorms = {}
         self.data = []
         self.blocksize = blocksize
         self.ncols = None
         self.isfinal = isfinal
+        self.num_keys = 0
 
     def QR(self):
         return np.linalg.qr(np.array(self.data), 'r')
@@ -312,8 +313,8 @@ class NMFReduce(MatrixHandler):
         if len(self.data) > self.blocksize * self.ncols:
             self.compress()
 
-    def handle_colsums(self, key, values):
-        self.colsums[key] = sum(values)
+    def handle_colnorms(self, key, values):
+        self.colnorms[key] = sum(values)
 
     def close(self):
         self.compress()
@@ -332,19 +333,23 @@ class NMFReduce(MatrixHandler):
                 yield ('QR', key), row
 
         # Emit column sums
-        for key in self.colsums:
-            yield ('colsums', key), self.colsums[key]
+        for key in self.colnorms:
+            yield ('colnorms', key), self.colnorms[key]
 
     def __call__(self, data):
         for key, values in data:
+            self.num_keys += 1
+            if not (self.num_keys % 50000):
+                self.counters['keys processed'] += 50000
+
             if key[0] == 'GP':
                 for val in values:
                     self.handle_GP(key[1], val)
             elif key[0] == 'QR':
                 for val in values:
                     self.handle_QR(key[1], val)
-            elif key[0] == 'colsums':
-                self.handle_colsums(key[1], values)
+            elif key[0] == 'colnorms':
+                self.handle_colnorms(key[1], values)
             else:
                 raise DataFormatException('unknown key type: %s' % str(key[0]))
 
