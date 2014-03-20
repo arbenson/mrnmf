@@ -1,4 +1,17 @@
-#!/usr/bin/env dumbo
+"""
+   Copyright (c) 2014, Austin R. Benson, David F. Gleich, 
+   Purdue University, and Stanford University.
+   All rights reserved.
+ 
+   This file is part of MRNMF and is under the BSD 2-Clause License, 
+   which can be found in the LICENSE file in the root directory, or at 
+   http://opensource.org/licenses/BSD-2-Clause
+"""
+
+import dumbo
+import os
+import util
+import mrnmf
 
 """
 Driver script for NMF.  Let X be the data matrix.  This script can compute
@@ -44,17 +57,7 @@ of the R factor in QR:
       -hadoop $HADOOP_INSTALL -reduce_schedule 40,1 \
       -mat cells-kron-40k.bseq -output FC_out.bseq -blocksize 10 \
       -qr 0
-     
-
-Austin R. Benson
-Copyright (c) 2014
 """
-
-import dumbo
-import os
-import sys
-import util
-import mrnmf
 
 # create the global options structure
 gopts = util.GlobalOptions()

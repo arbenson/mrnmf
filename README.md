@@ -15,6 +15,10 @@ we are interested in a separable nonnegative matrix factorization:
 where _X(:, K)_ is some permuted column subset of _X_ with _|K|_ columns,
 and _H_ is _|K|_ x _n_ with nonnegative entries.
 
+This code is provided under the BSD 2-Clause License,
+which can be found in the LICENSE file in the root directory, or at 
+http://opensource.org/licenses/BSD-2-Clause.
+
 If you use this code in a publication, please cite:
 
 Benson, Austin R., Lee, Jason D., Rajwa, Bartek, and Gleich, David F.
