@@ -35,8 +35,6 @@ Overview
 --------
 The main Dumbo script is `RunNMF.py`.
 This is used to reduce the dimension of the problem.
-The main script for computing the columns and the
-coefficient matrix H is `NMFProcessAlgorithms.py`.
 This script supports computing any of the following:
 
 * Gaussian projection: G * X, where _G_ has Gaussian i.i.d. random entries
@@ -56,8 +54,10 @@ The parameters are:
 * 40,1 means 40 reducers in the first pass and 1 reducer in the second pass
 * $HADOOP_INSTALL is the location of Hadoop.
 
-Code for plots that appear in the paper are in the plotting directory.
-There, you can find the calls to SciPy's non-negative least squares solver.
+The main script for computing the extreme columns and the
+coefficient matrix _H_ is `NMFProcessAlgorithms.py`.
+
+Code for reproducing the plots in the paper are in the `plotting` directory.
 
 Full small example
 --------
@@ -92,6 +92,34 @@ Since X-ray is greedy, it may not get all of the columns with the target
 separation rank set to 4:
 
      python NMFProcessAlgorithms.py small.out-qrr.txt small.out-colnorms.txt 'xray' 5
+
+Partial computation
+--------
+We do not need to compute the Gaussian projection, R factor, and column factors.
+The script `RunNMF.py` supports running only a subset of these operations.
+
+We will continue using the data from the small example above.
+If we only wanted the R factor in the QR factorization:
+
+     dumbo start RunNMF.py -libjar feathers.jar -hadoop $HADOOP_INSTALL \
+     -reduce_schedule 2,1 -mat SmallNoisySep_10k_10_4.txt -output small.out \
+     -gp 0 -colnorms 0
+
+The last two options specify to _not_ do Gaussian projection or compute the
+column norms.
+Now, we see that only the R factor has been computed:
+
+     hadoop fs -ls small.out
+
+Alternatively, we could just omit the QR computation:
+
+     dumbo start RunNMF.py -libjar feathers.jar -hadoop $HADOOP_INSTALL \
+     -projsize 10 -reduce_schedule 2,1 -mat SmallNoisySep_10k_10_4.txt -output small.out \
+     -qr 0
+
+The computation of the R factor has been omitted:
+
+     hadoop fs -ls small.out
      
 
 Contact
