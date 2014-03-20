@@ -16,6 +16,7 @@ The script call is:
       dumbo start RunNMF.py \
       -libjar feathers.jar \
       -gp [0/1 on whether or not to compute Gaussian projection]
+      -projsize [number of rows to project on for GP]
       -qr [0/1 on whether or not to compute R factor in QR factorization] \
       -colnorms [0/1 on whether or not to compute the column l1 norms] \
       -hadoop [name of Hadoop for Dumbo to use] \
@@ -31,7 +32,8 @@ blocksize is b, then compression occurs every nb rows.
 
 Example usage for the script is:
 
-      dumbo start RunNMF.py -libjar feathers.jar -hadoop icme-hadoop1 -reduce_schedule 40,1 \
+      dumbo start RunNMF.py -libjar feathers.jar -projsize 100 \
+      -hadoop icme-hadoop1 -reduce_schedule 40,1 \
       -mat cells-kron-40k.bseq -output FC_out.bseq -blocksize 10
 
 This computes (1), (2) and (3) from above for the FC data on
