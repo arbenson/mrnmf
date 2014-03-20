@@ -15,6 +15,7 @@ we are interested in a separable nonnegative matrix factorization:
 where _X(:, K)_ is some permuted column subset of _X_ with _|K|_ columns,
 and _H_ is _|K|_ x _n_ with nonnegative entries.
 
+
 Setup
 --------
 This code needs the following software to run:
@@ -30,6 +31,7 @@ We assume that the matrix data records in HDFS are one of the following:
 * a list representing one row
 * a list of lists representing multiple rows
 * a numpy.ndarray type representing multiple rows
+
 
 Overview
 --------
@@ -59,11 +61,13 @@ coefficient matrix _H_ is `NMFProcessAlgorithms.py`.
 
 Code for reproducing the plots in the paper are in the `plotting` directory.
 
+
 Full small example
 --------
 A small noisy r-separable matrix is available in `SmallNoisySep_10k_10_4.txt`.
 The matrix has 10,000 rows, 10 columns, and a separation rank of 4 (r = 4),
-and was generated with `util_scripts/GenSyntheticSepSmall.py`.
+and was generated with `util_scripts/GenSyntheticSepSmall.py`.  The noise
+level was 1e-3.
 First, put the matrix in HDFS:
 
      hadoop fs -put data/SmallNoisySep_10k_10_4.txt SmallNoisySep_10k_10_4.txt
@@ -88,10 +92,12 @@ Compute NMF with different algorithms:
      python NMFProcessAlgorithms.py small.out-qrr.txt small.out-colnorms.txt 'xray' 4
      python NMFProcessAlgorithms.py small.out-proj.txt small.out-colnorms.txt 'GP' 4
 
+We see that the noise level for SPA is near 1e-3, as expected.
 Since X-ray is greedy, it may not get all of the columns with the target
 separation rank set to 4:
 
      python NMFProcessAlgorithms.py small.out-qrr.txt small.out-colnorms.txt 'xray' 5
+
 
 Partial computation
 --------
@@ -120,7 +126,30 @@ Alternatively, we could just omit the QR computation:
 The computation of the R factor has been omitted:
 
      hadoop fs -ls small.out
-     
+
+
+Flow cytometry (FC) setup
+--------
+
+The original FC measurements are in `data/FC_40k.txt`.
+We are interested in the Kronecker product of this matrix.
+We form the Kronecker product with MapReduce.
+First, copy the data to HDFS:
+
+     hadoop fs -put data/FC_40k.txt FC_40k.txt
+
+Now, run the MapReduce job to form the Kronecker product:
+
+     dumbo start FC_kron.py -mat FC_40k.txt -output FC_kron.bseq -hadoop $HADOOP_INSTALL
+
+The rows of the matrix are grouped with 1000 rows per record.
+With the Kronecker product on HDFS, we can do dimension reduction:
+
+     dumbo start RunNMF.py -libjar feathers.jar -hadoop $HADOOP_INSTALL \
+     -reduce_schedule 40,1 -mat FC_kron.bseq -output FC_data.out
+
+Large synthetic matrices setup
+--------
 
 Contact
 --------
