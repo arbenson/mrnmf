@@ -1,4 +1,4 @@
-FC_40k.txt: Flow cytometry data
+FC_40k.txt: Flow cytometry (FC) data
 
 Hprime_20_200.txt: synthetic H factor used in paper
 
