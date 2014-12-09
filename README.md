@@ -4,7 +4,7 @@ Austin R. Benson, Jason D. Lee, Bartek Rajwa, and David F. Gleich.
 
 This code provides a MapReduce implementation of the large-scale near-separable nonnegative matrix
 factorizations described in
-[Scalable methods for nonnegative matrix factorizations of near-separable tall-and-skinny matrices](http://arxiv.org/abs/1402.6964).
+[Scalable methods for nonnegative matrix factorizations of near-separable tall-and-skinny matrices](http://papers.nips.cc/paper/5335-scalable-methods-for-nonnegative-matrix-factorizations-of-near-separable-tall-and-skinny-matrices.pdf).
 The implementation uses Hadoop with Python streaming, supported by Dumbo and Feathers.
 
 Given a data matrix _X_ of size _m_ x _n_, with _m_ >> _n_ and nonnegative entries,
@@ -21,9 +21,16 @@ http://opensource.org/licenses/BSD-2-Clause.
 
 If you use this code in a publication, please cite:
 
-Benson, Austin R., Lee, Jason D., Rajwa, Bartek, and Gleich, David F.
-"Scalable methods for nonnegative matrix factorizations of near-separable tall-and-skinny matrices."
-arXiv preprint arXiv:1402.6964 (2014).
+Austin R. Benson, Jason D. Lee, Bartek Rajwa, and David F. Gleich.
+Scalable methods for nonnegative matrix factorizations of near-separable tall-and-skinny matrices.
+In Proceedings of Neural Information Processing Systems (NIPS) 2014.
+
+
+Data
+--------
+The heat transfer simulation data is available from the [Open Source Data Cloud](https://www.opensciencedatacloud.org/publicdata/heat-transfer/).
+
+The flow cytometry data is in `data/FC_40k.txt`.  This is the data matrix before taking the Kronecker product, which is what we analyze in the paper.  See below for how to construct the Kronecker product from this data.
 
 
 Setup
