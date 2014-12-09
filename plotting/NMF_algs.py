@@ -36,7 +36,7 @@ def visualize_resids(numcols, rs, fname=None):
     F.subplots_adjust(bottom=0.15)
     F.subplots_adjust(left=0.20)
     plt.show()
-    F.set_size_inches((4, 4))
+    F.set_size_inches((3.5, 3.5))
     if fname != None:
         fig.savefig(fname + '.eps')
 

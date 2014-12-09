@@ -20,7 +20,6 @@ if 1:
     path3 = 'data/heat-transfer/heat-transfer-normalized-proj.txt'
     data3 = parse_normalized(path3, cols_path)
 
-    '''
     rs = []
     numcols = range(1, 64, 2)
     for cols in numcols:
@@ -29,7 +28,6 @@ if 1:
         cols3, H3, resid3 = compute_extreme_pts(data3, cols, 'GP', cols_path)
         rs.append((resid1, resid2, resid3))
     visualize_resids(numcols, rs, 'heat_residuals')
-    '''
     
     r = 10
     # This is one of the biggest hacks I have ever done.  For some reason,
@@ -39,12 +37,11 @@ if 1:
     cols0.sort()
     print cols0
 
-
     cols1, H1, resid1 = compute_extreme_pts(data1, r, 'SPA', cols_path)
-    '''
+    """
     visualize(H1, cols1, 'SPA',
               'heat_coeffs_SPA')
-    '''
+    """
 
     v1 = H1[cols1.index(0), 0:34]
     v2 = H1[cols1.index(33), 0:34]
@@ -57,18 +54,17 @@ if 1:
     rcParams.update({'figure.autolayout': True})
     plt.plot(inds, v1, 'b-*')
     plt.plot(inds, v2, 'g-o')
-    plt.legend(['Column 1', 'Column 34'], loc=6)
+    plt.legend(['Col. 1', 'Col. 34'], loc=6)
     plt.xlabel('Column index')
     plt.ylabel('Coefficient matrix (H) value')
     F = plt.gcf()
     plt.show()
-    F.set_size_inches((4, 4))
+    F.set_size_inches((3, 3))
     fig.savefig('heat_combinations.eps')
 
     cols1.sort()
     print cols1
 
-    '''
     cols2, H2, resid2 = compute_extreme_pts(data2, r, 'xray')
     visualize(H2, cols2, 'XRAY',
               'heat_coeffs_XRAY')
@@ -83,4 +79,4 @@ if 1:
 
     visualize_cols([cols1, cols2, cols3], H3.shape[1], ['SPA', 'XRAY', 'GP'],
                    'heat_cols')
-    '''
+
